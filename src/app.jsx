@@ -126,18 +126,19 @@ export function App ({state, DOM, router, store}) {
     const total      = state.todos.length
     // number of todos that haven't been marked as complete
     const remaining  = state.todos.filter(todo => !todo.completed).length
+    // number of completed todos
+    const completed  = total - remaining
     // are all todos completed?
     const allDone    = remaining === 0
     
     // render helpers
-    const showHide   = (total => test => total > test?{}:{display: 'none'})(total)
     const selected   = (visibility => filter => visibility === filter ? ' selected' : '')(state.visibility)
     
     return (
       <section className="todoapp">
         {renderHeader()}
-        {renderMain(showHide, allDone, visibleTodos)}
-        {renderFooter(showHide, selected, remaining)}
+        {total ? renderMain(allDone, visibleTodos) : ''}
+        {total ? renderFooter(selected, remaining, completed) : ''}
       </section>
     )
   })
@@ -161,9 +162,9 @@ function renderHeader() {
   )
 }
 
-function renderMain(showHide, allDone, todos) {
+function renderMain(allDone, todos) {
   return (
-    <section className="main" style={showHide(0)}>
+    <section className="main">
       <input id="toggle-all" className="toggle-all" type="checkbox" checked={allDone} />
       <label for="toggle-all">Mark all as complete</label>
       <ul className="todo-list">
@@ -173,21 +174,20 @@ function renderMain(showHide, allDone, todos) {
   )
 }
 
-function renderFooter(showHide, selected, remaining) {
+function renderFooter(selected, remaining, completed) {
   const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1)
+  const links = ['all', 'active', 'completed']
   return (
-    <footer className="footer" style={showHide(0)}>
+    <footer className="footer">
       <span className="todo-count">
         <strong>{remaining}</strong> item{remaining!==1?'s':''} left
       </span>
       <ul className="filters">
-        {['all', 'active', 'completed'].map(visibility => (
-          <li><a href={`#/${visibility}`} className={selected(visibility)}>{capitalize(visibility)}</a></li>
+        {links.map(link => (
+          <li><a href={`#/${link}`} className={selected(link)}>{capitalize(link)}</a></li>
         ))}
       </ul>
-      <button className="clear-completed" style={showHide(remaining)}>
-        Clear completed
-      </button>
+      {completed ? <button className="clear-completed">Clear completed</button> : ''}
     </footer>
   )
 }
