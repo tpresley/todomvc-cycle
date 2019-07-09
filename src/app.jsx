@@ -1,5 +1,6 @@
 import xs from 'xstream'
 import sampleCombine from 'xstream/extra/sampleCombine'
+import debounce from 'xstream/extra/debounce'
 import delay from 'xstream/extra/delay'
 import {setAction as set, makeOnAction, inputEvents, log} from './lib/utils'
 import todos from './components/todos'
@@ -62,7 +63,7 @@ export function App ({state, DOM, router, store}) {
     set('NEW_TODO',        newTodo$),
     set('TOGGLE_ALL',      toggleAll$),
     set('CLEAR_COMPLETED', clearCompleted$),
-  ).compose(log(({type}) => type))
+  ).compose(log(({type}) => '[APP] Action: ' + type))
 
   // initialize the "on" helper
   //  - this helper returns the action$ stream filtered for a specific action type
@@ -112,16 +113,16 @@ export function App ({state, DOM, router, store}) {
     on('CLEAR_COMPLETED', (state, _) => {
       return {...state, todos: state.todos.filter(todo => !todo.completed)}
     }),
-  )
+  ).compose(log('[APP] State Reducer Added'))
 
   // map DOM side effect actions 
   //  - delay the stream events 1ms to ensure latest state changes are rendered before applying side effects
   const DOMfx$ = xs.merge(
     on('CLEAR_FORM', {type: 'SET_VALUE', data: {selector: '.new-todo'}}),
-  ).compose(delay(1))
+  ).compose(delay(5)).compose(log(({type}) => '[APP] DOM Side Effect Requested: ' + type))
 
   // render the view
-  const vdom$ = xs.combine(state$, todoVdom$).map(([state, visibleTodos]) => {
+  const vdom$ = xs.combine(state$, todoVdom$).compose(debounce(1)).map(([state, visibleTodos]) => {
     // total todos
     const total      = state.todos.length
     // number of todos that haven't been marked as complete
@@ -141,7 +142,7 @@ export function App ({state, DOM, router, store}) {
         {total ? renderFooter(selected, remaining, completed) : ''}
       </section>
     )
-  })
+  }).compose(log('[APP] View Rendered'))
 
   // collect and return sinks
   return {

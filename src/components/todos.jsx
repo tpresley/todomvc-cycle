@@ -20,7 +20,12 @@ export default function todos(sources) {
   const lense = {
     get: state => {
       // filter based on selected visibility
-      return state.todos.filter(filters[state.visibility])
+      //  - makeCollection uses reference checks to determine changes so 
+      //    for best performance, return the same object if you don't want
+      //    to re-render, and return a new object if you do
+      return state.todos.map(todo => {
+        return filters[state.visibility](todo) ? todo : {...todo, hidden: true}
+      })
     },
     set: (state, childState) => {
       return {
@@ -55,7 +60,8 @@ export default function todos(sources) {
 
 // individual todo component
 function todo({state, DOM}) {
-  const state$    = state.stream
+  const cleanup$  = xs.create()
+  const state$    = state.stream.endWhen(cleanup$)
   
   // collect DOM events and elements
   const toggle$   = DOM.select('.toggle').events('click')
@@ -80,7 +86,9 @@ function todo({state, DOM}) {
     set('EDIT_START',  label$),
     set('EDIT_DONE',   doneEditing$),
     set('EDIT_CANCEL', escape$)
-  ).compose(log(({type}) => type))
+  )
+  .endWhen(cleanup$)
+  .compose(log(({type}) => '[TODO] Action: ' + type))
 
   // initialize the "on" helper
   //  - this helper returns the action$ stream filtered for a specific action type
@@ -96,7 +104,10 @@ function todo({state, DOM}) {
     // toggle completion of the todo
     on('TOGGLE',     (state, _) => ({...state, completed: !state.completed})),
     // delete todo
-    on('DESTROY',    (state, _) => ({...state, deleted: true})),
+    on('DESTROY',    (state, _, next) => {
+      next('CLEANUP')
+      return {...state, deleted: true}
+    }),
     // start editing todo
     on('EDIT_START', (state, _, next) => {
       const selector = '.todo-' + state.id + ' .edit'
@@ -123,6 +134,8 @@ function todo({state, DOM}) {
       return {...state, title: state.cachedTitle, editing: false, cachedTitle: ''}
     })
   )
+  .endWhen(cleanup$)
+  .compose(log('[TODO] State Reducer Added'))
 
   // map DOM side effect actions 
   //  - emit the data value of the action
@@ -130,10 +143,15 @@ function todo({state, DOM}) {
   const DOMfx$ = xs.merge(
     on('SET_EDIT_VALUE'  ),
     on('FOCUS_EDIT_FIELD'),
-  ).map(({data}) => data).compose(delay(1))
+  )
+  .endWhen(cleanup$)
+  .map(({data}) => data)
+  .compose(delay(5))
+  .compose(log(({type}) => '[TODO] DOM Side Effect Requested: ' + type))
 
   // render the view
   const vdom$ = state$.map(state => {
+    if (state.hidden) return
     // calculate class for todo
     let classes = ['todo']
     classes.push('todo-' + state.id)
@@ -154,6 +172,16 @@ function todo({state, DOM}) {
       </li>
     )
   })
+  .endWhen(cleanup$)
+  .compose(log('[TODO] View Rendered'))
+  
+  // listen for the CLEANUP action and signal to streams to complete
+  //  - there is a bug in makeCollection from @cycle/state that causes old instances of 
+  //    items in the collection to keep getting events if a new item with the same id is added
+  //  - this almost certainly means there is a memory leak
+  //  - it also means that any subscribed DOM event handlers don't get cleaned up properly
+  //  - with this workaround, the DOM events will still fire, but unwanted actions in the old instances will be prevented
+  cleanup$.imitate(on('CLEANUP').take(1))
 
   // collect and return sinks
   return {
