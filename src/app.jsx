@@ -2,9 +2,10 @@ import xs from 'xstream'
 import sampleCombine from 'xstream/extra/sampleCombine'
 import debounce from 'xstream/extra/debounce'
 import delay from 'xstream/extra/delay'
-import {setAction as set, makeOnAction, inputEvents, log} from './lib/utils'
+import {setAction as set, makeOnAction, inputEvents, ABORT, newId, makeLog} from './lib/utils'
 import todos from './components/todos'
 
+const log = makeLog('APP')
 
 // root component
 //
@@ -31,12 +32,14 @@ export function App ({state, DOM, router, store}) {
   const initialState     = {visibility: 'all'}
   
   // fetch stored todos from local storage
+  //  - init to an empty array if no todos were found
   const store$           = store.get('todos')
+                                .map(todos => todos || [])
 
   // combine initial state with todos from local storage
   // and convert the data to a reducer
   const initialReducer$  = xs.combine(xs.of(initialState), store$)
-                             .map(([initialState, todosFromStorage]) => (state, _) => ({ ...initialState, todos: todosFromStorage||[] }))
+                             .map(([initialState, todosFromStorage]) => (state, _) => ({ ...initialState, todos: todosFromStorage }))
 
   // collect required DOM events and elements
   const toggleAll$       = DOM.select('.toggle-all').events('click')
@@ -51,7 +54,8 @@ export function App ({state, DOM, router, store}) {
   const {state: todoReducer$, DOM: todoVdom$, DOMfx: todoDomfx$} = todos({state, DOM})
 
   // create a stream of titles whenever a new todo is submitted
-  const newTodo$ = enter$.compose(sampleCombine(value$)).map(([_, title]) => title)
+  const newTodo$ = enter$.compose(sampleCombine(value$))
+                         .map(([_, title]) => title)
 
   // add routes to handle filtering based on browser path
   const route$ = xs.of('all', 'active', 'completed')
@@ -63,7 +67,8 @@ export function App ({state, DOM, router, store}) {
     set('NEW_TODO',        newTodo$),
     set('TOGGLE_ALL',      toggleAll$),
     set('CLEAR_COMPLETED', clearCompleted$),
-  ).compose(log(({type}) => '[APP] Action: ' + type))
+  )
+  .compose(log(({type}) => 'Action: ' + type))
 
   // initialize the "on" helper
   //  - this helper returns the action$ stream filtered for a specific action type
@@ -74,19 +79,16 @@ export function App ({state, DOM, router, store}) {
   //    + if anything else, that value will be emitted when the action happens
   const on = makeOnAction(action$)
 
-  // map state reducers to actions
+  // map actions into state reducers
   const reducer$ = xs.merge(
     // change the visibility filter for the todos
     on('VISIBILITY', (state, data) => ({...state, visibility: data})),
     // add new todo
     on('NEW_TODO',   (state, data, next) => {
-      // ignore if new todo title is empty
-      if (!data.trim()) return state
-      // find the highest id from current todos
-      const maxId = state.todos.map(todo => todo.id)
-                               .reduce((max, id) => id > max ? id : max, 0)
+      // abort action if todo title is blank
+      if (!data.trim()) return ABORT
       // calculate next id
-      const nextId = maxId + 1
+      const nextId = newId(state.todos)
 
       // send a new action to clear the new todo field
       next('CLEAR_FORM')
@@ -113,13 +115,17 @@ export function App ({state, DOM, router, store}) {
     on('CLEAR_COMPLETED', (state, _) => {
       return {...state, todos: state.todos.filter(todo => !todo.completed)}
     }),
-  ).compose(log('[APP] State Reducer Added'))
+  )
+  .filter(reducer => reducer !== ABORT)
+  .compose(log('State Reducer Added'))
 
   // map DOM side effect actions 
-  //  - delay the stream events 1ms to ensure latest state changes are rendered before applying side effects
+  //  - delay the stream events 5ms to ensure latest state changes are rendered before applying side effects
   const DOMfx$ = xs.merge(
     on('CLEAR_FORM', {type: 'SET_VALUE', data: {selector: '.new-todo'}}),
-  ).compose(delay(5)).compose(log(({type}) => '[APP] DOM Side Effect Requested: ' + type))
+  )
+  .compose(delay(5))
+  .compose(log(({type}) => 'DOM Side Effect Requested: ' + type))
 
   // render the view
   const vdom$ = xs.combine(state$, todoVdom$).compose(debounce(1)).map(([state, visibleTodos]) => {
@@ -138,11 +144,12 @@ export function App ({state, DOM, router, store}) {
     return (
       <section className="todoapp">
         {renderHeader()}
-        {total ? renderMain(allDone, visibleTodos) : ''}
-        {total ? renderFooter(selected, remaining, completed) : ''}
+        {(total > 0) ? renderMain(allDone, visibleTodos) : ''}
+        {(total > 0) ? renderFooter(selected, remaining, completed) : ''}
       </section>
     )
-  }).compose(log('[APP] View Rendered'))
+  })
+  .compose(log('View Rendered'))
 
   // collect and return sinks
   return {
@@ -176,19 +183,34 @@ function renderMain(allDone, todos) {
 }
 
 function renderFooter(selected, remaining, completed) {
-  const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1)
-  const links = ['all', 'active', 'completed']
   return (
     <footer className="footer">
-      <span className="todo-count">
-        <strong>{remaining}</strong> item{remaining!==1?'s':''} left
-      </span>
-      <ul className="filters">
-        {links.map(link => (
-          <li><a href={`#/${link}`} className={selected(link)}>{capitalize(link)}</a></li>
-        ))}
-      </ul>
-      {completed ? <button className="clear-completed">Clear completed</button> : ''}
+      {renderCount(remaining)}
+      {renderFilters(selected)}
+      {renderClearCompleted(completed)}
     </footer>
   )
+}
+
+function renderCount(remaining) {
+  return (
+    <span className="todo-count">
+      <strong>{remaining}</strong> item{(remaining !== 1) ? 's' : ''} left
+    </span>
+  )
+}
+
+function renderFilters(selected) {
+  const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1)
+  const links = ['all', 'active', 'completed']
+  const renderLink = link => <li><a href={`#/${link}`} className={selected(link)}>{capitalize(link)}</a></li>
+  return (
+    <ul className="filters">
+      {links.map(renderLink)}
+    </ul>
+  )
+}
+
+function renderClearCompleted(completed) {
+  return (completed > 0) ? <button className="clear-completed">Clear completed</button> : ''
 }

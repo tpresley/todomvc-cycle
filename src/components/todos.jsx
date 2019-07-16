@@ -3,8 +3,9 @@ import sampleCombine from 'xstream/extra/sampleCombine'
 import delay from 'xstream/extra/delay'
 import isolate from '@cycle/isolate'
 import {makeCollection} from '@cycle/state'
-import {setAction as set, makeOnAction, inputEvents, log} from '../lib/utils'
+import {setAction as set, makeOnAction, inputEvents, makeLog} from '../lib/utils'
 
+const log = makeLog('TODO')
 
 // todos collection component
 //  - sources are passed directly to the created collection of todo items
@@ -57,11 +58,9 @@ export default function todos(sources) {
 
 
 
-
 // individual todo component
 function todo({state, DOM}) {
-  const cleanup$  = xs.create()
-  const state$    = state.stream.endWhen(cleanup$)
+  const state$    = state.stream
   
   // collect DOM events and elements
   const toggle$   = DOM.select('.toggle').events('click')
@@ -87,8 +86,7 @@ function todo({state, DOM}) {
     set('EDIT_DONE',   doneEditing$),
     set('EDIT_CANCEL', escape$)
   )
-  .endWhen(cleanup$)
-  .compose(log(({type}) => '[TODO] Action: ' + type))
+  .compose(log(({type}) => 'Action: ' + type))
 
   // initialize the "on" helper
   //  - this helper returns the action$ stream filtered for a specific action type
@@ -104,10 +102,7 @@ function todo({state, DOM}) {
     // toggle completion of the todo
     on('TOGGLE',     (state, _) => ({...state, completed: !state.completed})),
     // delete todo
-    on('DESTROY',    (state, _, next) => {
-      next('CLEANUP')
-      return {...state, deleted: true}
-    }),
+    on('DESTROY',    (state, _) => ({...state, deleted: true})),
     // start editing todo
     on('EDIT_START', (state, _, next) => {
       const selector = '.todo-' + state.id + ' .edit'
@@ -134,8 +129,7 @@ function todo({state, DOM}) {
       return {...state, title: state.cachedTitle, editing: false, cachedTitle: ''}
     })
   )
-  .endWhen(cleanup$)
-  .compose(log('[TODO] State Reducer Added'))
+  .compose(log('State Reducer Added'))
 
   // map DOM side effect actions 
   //  - emit the data value of the action
@@ -144,10 +138,9 @@ function todo({state, DOM}) {
     on('SET_EDIT_VALUE'  ),
     on('FOCUS_EDIT_FIELD'),
   )
-  .endWhen(cleanup$)
   .map(({data}) => data)
   .compose(delay(5))
-  .compose(log(({type}) => '[TODO] DOM Side Effect Requested: ' + type))
+  .compose(log(({type}) => 'DOM Side Effect Requested: ' + type))
 
   // render the view
   const vdom$ = state$.map(state => {
@@ -171,17 +164,9 @@ function todo({state, DOM}) {
         <input className="edit" type="text" value={state.title} />
       </li>
     )
-  })
-  .endWhen(cleanup$)
-  .compose(log('[TODO] View Rendered'))
+  })  
+  .compose(log('View Rendered'))
   
-  // listen for the CLEANUP action and signal to streams to complete
-  //  - there is a bug in makeCollection from @cycle/state that causes old instances of 
-  //    items in the collection to keep getting events if a new item with the same id is added
-  //  - this almost certainly means there is a memory leak
-  //  - it also means that any subscribed DOM event handlers don't get cleaned up properly
-  //  - with this workaround, the DOM events will still fire, but unwanted actions in the old instances will be prevented
-  cleanup$.imitate(on('CLEANUP').take(1))
 
   // collect and return sinks
   return {

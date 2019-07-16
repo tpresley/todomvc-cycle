@@ -2,6 +2,8 @@ import xs from 'xstream'
 import isolate from '@cycle/isolate'
 import dropRepeats from 'xstream/extra/dropRepeats'
 
+export const ABORT = '~~ABORT~~'
+
 // logging function meant to be used inside of an xstream .compose() 
 //
 //  - accepts either a String or a Function
@@ -9,16 +11,28 @@ import dropRepeats from 'xstream/extra/dropRepeats'
 //  - functions will be called with the stream's value and the result will be logged ot console
 //  - only logs if the global DEBUG variable is set to true
 //
-export function log (msg) {
-  const fixedMsg = (typeof msg === 'function') ? msg : _ => msg
-  return stream => {
-    stream.map(fixedMsg).subscribe({
-      next: _ => {
-        if (window.DEBUG) console.log(_)
-      }
-    })
-    return stream
+export function makeLog (context) {
+  return function (msg) {
+    const fixedMsg = (typeof msg === 'function') ? msg : _ => msg
+    return stream => {
+      stream.map(fixedMsg).subscribe({
+        next: msg => {
+          if (window.DEBUG) console.log(`[${context}] ${msg}`)
+        }
+      })
+      return stream
+    }
   }
+}
+
+// calculate the next id given an array of objects
+//
+//  - simply finds the current highest id and returns that plus 1
+//
+export function newId(items, idKey='id') {
+  const maxId = items.map(item => item[idKey])
+                     .reduce((max, id) => id > max ? id : max, 0)
+  return maxId + 1
 }
 
 // simple function to map an incoming stream to "action" objects
