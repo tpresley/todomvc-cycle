@@ -6,6 +6,7 @@ import {setAction as set, makeOnAction, inputEvents, ABORT, newId, makeLog} from
 import todos from './components/todos'
 
 const log = makeLog('APP')
+const FILTER_LIST = ['all', 'active', 'completed']
 
 // root component
 //
@@ -58,7 +59,7 @@ export function App ({state, DOM, router, store}) {
                          .map(([_, title]) => title)
 
   // add routes to handle filtering based on browser path
-  const route$ = xs.of('all', 'active', 'completed')
+  const route$ = xs.fromArray(FILTER_LIST)
   
   // map streams to actions
   //  - the "set" helper maps the input stream to "action" objects, e.g. {type: 'SOME_ACTION', data: 'value emitted from input stream'}
@@ -202,7 +203,7 @@ function renderCount(remaining) {
 
 function renderFilters(selected) {
   const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1)
-  const links = ['all', 'active', 'completed']
+  const links = FILTER_LIST
   const renderLink = link => <li><a href={`#/${link}`} className={selected(link)}>{capitalize(link)}</a></li>
   return (
     <ul className="filters">
