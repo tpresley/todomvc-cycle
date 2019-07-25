@@ -1,9 +1,7 @@
 import xs from 'xstream'
 import sampleCombine from 'xstream/extra/sampleCombine'
 import delay from 'xstream/extra/delay'
-import isolate from '@cycle/isolate'
-import {makeCollection} from '@cycle/state'
-import {setAction as set, makeOnAction, inputEvents, makeLog} from '../lib/utils'
+import {makeIsolatedCollection, setAction as set, makeOnAction, inputEvents, makeLog, classes} from '../lib/utils'
 
 const log = makeLog('TODO')
 
@@ -35,14 +33,13 @@ export default function todos(sources) {
         // and remove any todos marked as deleted
         todos: state.todos.map(todo => {
           const newTodo = childState.find(ctodo => ctodo.id === todo.id)
-          return newTodo||todo
+          return newTodo || todo
         }).filter(todo => !todo.deleted)
       }
     }
   }
   
-  // instantiate the todos collection and isolate using the lense for state
-  return isolate(makeCollection({
+  const collectionOpts = {
     item:         todo,
     itemKey:      state => state.id,
     itemScope:    key => key,
@@ -53,7 +50,12 @@ export default function todos(sources) {
       DOM:   instances.pickCombine('DOM'),
       DOMfx: instances.pickMerge('DOMfx'),
     })
-  }), {state: lense})(sources)
+  }
+
+  const isolateOpts = {state: lense}
+
+  // instantiate the todos collection and isolate using the lense for state
+  return makeIsolatedCollection(collectionOpts, isolateOpts, sources)
 }
 
 
@@ -146,16 +148,13 @@ function todo({state, DOM}) {
   const vdom$ = state$.map(state => {
     if (state.hidden) return
     // calculate class for todo
-    let classes = ['todo']
-    classes.push('todo-' + state.id)
-    if (state.completed) classes.push('completed')
-    if (state.editing)   classes.push('editing')
-    const todoClass = classes.join(' ')
+    const classNames = classes('todo', 'todo-' + state.id, {completed: state.completed, editing: state.editing})
+    
     // is the todo completed?
     const checked = !!state.completed
 
     return (
-      <li className={todoClass}>
+      <li className={classNames}>
         <div className="view">
           <input className="toggle" type="checkbox" checked={checked} />
           <label>{state.title}</label>

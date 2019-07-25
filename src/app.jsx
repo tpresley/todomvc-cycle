@@ -188,7 +188,7 @@ function renderFooter(selected, remaining, completed) {
     <footer className="footer">
       {renderCount(remaining)}
       {renderFilters(selected)}
-      {renderClearCompleted(completed)}
+      {(completed > 0) ? renderClearCompleted() : ''}
     </footer>
   )
 }
@@ -196,7 +196,7 @@ function renderFooter(selected, remaining, completed) {
 function renderCount(remaining) {
   return (
     <span className="todo-count">
-      <strong>{remaining}</strong> item{(remaining !== 1) ? 's' : ''} left
+      <strong>{remaining}</strong> {(remaining === 1) ? 'item' : 'items'} left
     </span>
   )
 }
@@ -212,6 +212,6 @@ function renderFilters(selected) {
   )
 }
 
-function renderClearCompleted(completed) {
-  return (completed > 0) ? <button className="clear-completed">Clear completed</button> : ''
+function renderClearCompleted() {
+  return <button className="clear-completed">Clear completed</button>
 }
