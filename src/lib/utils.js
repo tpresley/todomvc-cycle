@@ -39,9 +39,8 @@ export function makeLog (context) {
  * @return {Number} the highest value in the `id` field of the objects in the array plus one
  */
 export function newId(items, idKey='id') {
-  const maxId = items.map(item => item[idKey])
-                     .reduce((max, id) => id > max ? id : max, 0)
-  return maxId + 1
+  return items.map(item => item[idKey])
+              .reduce((max, id) => id > max ? id : max, 0) + 1
 }
 
 /**
@@ -55,16 +54,19 @@ export function newId(items, idKey='id') {
  * this function makes it easier to set dynamic classes on HTML elements
  */
 export function classes(...args) {
-  return args.reduce((acc, arg) => {
-    if (typeof arg === 'string' && !acc.includes(arg)) {
-      acc.push(...classes_processString(arg))
+  const classSet =  args.reduce((acc, arg) => {
+    const addToSet = acc.add.bind(acc)
+    if (typeof arg === 'string') {
+      classes_processString(arg).map(addToSet)
     } else if (Array.isArray(arg)) {
-      acc.push(...classes_processArray(arg))
+      classes_processArray(arg).map(addToSet)
     } else if (typeof arg === 'object') {
-      acc.push(...classes_processObject(arg))
+      classes_processObject(arg).map(addToSet)
     }
     return acc
-  }, []).join(' ')
+  }, new Set())
+  //convert Set to Array and join with spaces
+  return [...classSet].join(' ')
 }
 
 /**
@@ -74,6 +76,7 @@ export function classes(...args) {
  * @return {Boolean} true if the name is a valid CSS class, false otherwise
  */
 function isValidClassName (className) {
+  //technically CSS classes can include unicode characters, but ignoring for now
   return /^[a-zA-Z0-9-_]+$/.test(className)
 }
 
@@ -100,6 +103,7 @@ function classes_processString(str) {
  * @return {Array} valid CSS class names from the provided array 
  */
 function classes_processArray(arr) {
+  if (!Array.isArray(arr)) throw new Error('Expecting an array of strings')
   return arr.map(classes_processString).flat()
 }
 
@@ -113,14 +117,14 @@ function classes_processArray(arr) {
  * if the value is a function, it will be run and the returned value will be used
  */
 function classes_processObject(obj) {
-  const ret =  Object.entries(obj)
-                     .filter(([key, predicate]) => (typeof predicate === 'function') ? predicate() : !!predicate)
-                     .map(([key, _]) => {
-                       const trimmed = key.trim()
-                       if (!isValidClassName(trimmed)) throw new Error (`${trimmed} is not a valid CSS class name`)
-                       return trimmed
-                      })
-  return ret
+  if (typeof obj !== 'object') throw new Error ('Expecting an object')
+  return Object.entries(obj)
+               .filter(([key, predicate]) => (typeof predicate === 'function') ? predicate() : !!predicate)
+               .map(([key, _]) => {
+                 const trimmed = key.trim()
+                 if (!isValidClassName(trimmed)) throw new Error (`${trimmed} is not a valid CSS class name`)
+                 return trimmed
+               })
 }
 
 /**
