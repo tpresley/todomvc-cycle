@@ -3,34 +3,6 @@ import isolate from '@cycle/isolate'
 import {makeCollection} from '@cycle/state'
 import dropRepeats from 'xstream/extra/dropRepeats'
 
-export const ABORT = '~~ABORT~~'
-
-/**
- * factory to create a logging function meant to be used inside of an xstream .compose() 
- * 
- * @param {String} context name of the component or file to be prepended to any messages 
- * @return {Function} 
- * 
- * returned function accepts either a `String` of `Function`
- * `String` values will be logged to `console` as is
- * `Function` values will be called with the current `stream` value and the result will be logged to `console`
- * all output will be prepended with the `context` (ex. "[CONTEXT] My output")
- * ONLY outputs if the global `DEBUG` variable is set to `true`
- */
-export function makeLog (context) {
-  return function (msg) {
-    const fixedMsg = (typeof msg === 'function') ? msg : _ => msg
-    return stream => {
-      stream.map(fixedMsg).subscribe({
-        next: msg => {
-          if (window.DEBUG) console.log(`[${context}] ${msg}`)
-        }
-      })
-      return stream
-    }
-  }
-}
-
 /**
  * calculate the next id given an array of objects
  * 
@@ -124,72 +96,6 @@ function classes_processObject(obj) {
 }
 
 /**
- * simple function to map an incoming stream to "action" objects
- * 
- * @param {String} type name of the action the `data$` stream should be mapped to
- * @param {Observable} data$ an observable that represents an action
- * 
- * emits objects of shape `{type: "SOME_ACTION", data: "values emitted from the source stream"}`
- * allows you to write `set('SOME_ACTION", sourceStream$)`
- * instead of `sourceStream$.map(data => ({type: "SOME_ACTION", data}))`
- */
-export function setAction (type, data$) {
-  return data$.map(data => ({type, data}))
-}
-
-
-/**
- * helper to filter a stream of actions to a specific type
- * 
- * @param {Observable} action$ observable stream of `actions`
- * @return {Function} function which filters for a specific `action` and optionally maps to a `value` or `state reducer`
- * 
- * initialize the helper by calling it with the action stream:
- * `const on = makeOnAction(action$)`
- * the returned function then lets you write:
- * `on('SOME_ACTION', (state, data, next) => ({...state, someProperty: data}))`
- * instead of:
- * `action$.filter(action => action.type === 'SOME_ACTION').map(({data}) => (state, data) => ({...state, someProperty: data}))`
- * the returned `Observable` depends on the 2nd argument:
- *   - if not provided, the action$ stream is filtered and returned
- *   - if it's a `Function` the provided funtion will be treated as a `state reducer` and called with `current state`, `value from the action`, and a `next` function
- *     + the return value of the `state reducer` you provided will become the new `state` for the current `isolation context`
- *     + the `next` function allows for follow up actions and should be called with the name of an `action` and optionally `data` required for that action
- *   - if anything else, that value will be emitted whenever the specified action is encountered 
- */
-export function makeOnAction (action$) {
-  return (name, reducer) => {
-    const filtered$ = action$.filter(action => action.type === name)
-    const next      = (type, data) => action$.shamefullySendNext({type, data})
-    
-    let returnStream$
-    if (typeof reducer === 'function') {
-      returnStream$ = filtered$.map(action => state => reducer(state, action.data, next))
-    } else if (reducer === undefined) {
-      returnStream$ = filtered$
-    } else {
-      const value = reducer
-      returnStream$ = filtered$.mapTo(value)
-    }
-
-    return returnStream$
-  }
-}
-
-/**
- * instantiate a cycle collection and isolate 
- * (makes the code for doing isolated collections more readable)
- * 
- * @param {Object} collectionOpts options for the makeCollection function (see cycle/state documentation)
- * @param {String|Object} isolateOpts options for the isolate function (see cycle/isolate documentation)
- * @param {Object} sources object of cycle style sources to use for the created collection
- * @return {Object} collection of component sinks
- */
-export function makeIsolatedCollection (collectionOpts, isolateOpts, sources) {
-  return isolate(makeCollection(collectionOpts), isolateOpts)(sources)
-}
-
-/**
  * create a group of components which can be switched between based on a stream of component names
  * 
  * @param {Object} factories maps names to component creation functions
@@ -230,18 +136,24 @@ export function makeSwitchGroup (factories, sources, name$, switched=['DOM']) {
  * @param {String} initialValue initial value to emit on the special `value$` stream
  * @return {Object} collection of event streams ready for mapping to actions
  */
-export function inputEvents (input$, initialValue='') {
-  const keydown$  = input$.events('keydown')
-  const keyup$    = input$.events('keyup')
-  const change$   = input$.events('change')
-  const focus$    = input$.events('focus')
-  const blur$     = input$.events('blur')
-  const value$    = xs.merge(keydown$, change$).map(e => e.target.value).startWith(initialValue)
+export function inputEvents (el$, initialValue='') {
+  const input$ = el$.events('input')
+  const keydown$  = el$.events('keydown')
+  const keyup$    = el$.events('keyup')
+  const change$   = el$.events('change')
+  const focus$    = el$.events('focus')
+  const blur$     = el$.events('blur')
+  const value$    = xs.merge(focus$, input$)
+    .map(e => e.target.value)
+    .startWith(initialValue)
+    .remember()
+    
   const enter$    = keydown$.filter(e => e.keyCode === 13).mapTo('enter')
   const escape$   = keydown$.filter(e => e.keyCode === 27).mapTo('escape')
 
   return {
     value$,
+    input$,
     enter$,
     escape$,
     focus$,

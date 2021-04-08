@@ -1,4 +1,5 @@
 import xs from 'xstream'
+import {adapt} from '@cycle/run/lib/adapt'
 import {Router} from 'director/build/director'
 
 export default function routerDriver (route$) {
@@ -12,14 +13,17 @@ export default function routerDriver (route$) {
   const action$ = xs.create({
     start: listener => {
       route$.subscribe({
-        next: route => {
-          router.on(route, _ => {
-            listener.next(route)
-          })
+        next: routes => {
+          routes = Array.isArray(routes) ? routes : [routes]
+          for (let route of routes) {
+            router.on(route, _ => {
+              listener.next(route)
+            })
+          }
         }
       })
     },
     stop: _ => undefined
   })
-  return action$
+  return adapt(action$)
 }

@@ -1,11 +1,30 @@
 import xs from 'xstream'
+import dropRepeats from 'xstream/extra/dropRepeats';
 
 export default function localStorageDriver (fx$) {
-  fx$.subscribe({next: ({key, value}) => {
-    localStorage.setItem(key, JSON.stringify(value))
+  fx$.addListener({next: ({key, value}) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value))
+    } catch(e) {
+      console.log(e)
+    }
   }})
 
   return {
-    get: key => xs.of(JSON.parse(window.localStorage.getItem(key)))
+    get: (key, defaultValue) => {
+      const fromStorage = window.localStorage.getItem(key)
+      let parsed
+      try {
+        parsed = (fromStorage && fromStorage != "null") ? JSON.parse(fromStorage) : defaultValue
+      } catch (e) {
+        console.log('Error reading from local storage')
+        parsed = defaultValue
+      }
+
+      return fx$.filter(({key: key_, value}) => key == key_)
+                .map(({value}) => value)
+                .compose(dropRepeats())
+                .startWith(parsed)
+    }
   }
 }
