@@ -53,13 +53,18 @@ function intent({STATE, DOM, ROUTER, STORE}) {
   //  - init to an empty array if no todos were found
   //  - wait until we get the initial state to avoid the retrieved todos getting overwritten
   const fromLocalStorage$ = STATE.stream
+    // limit to the first state update
     .take(1)
+    // when the first state update happens, take 1 event from the 'todos' localstorage key
+    // - if we don't limit to one STORE event, we will get a new event every time we save the todos to localstorage
     .map( _ => STORE.get('todos', []).take(1) )
+    // the map function above returns an event that is a stream...
+    // .flatten() "flatens" the stream in the event into a normal value
     .flatten()
 
   // fetch state changes to trigger writes to localstorage
   // - only start after we get the todos from localstorage
-  // - drop the first 2 events to avoid re-storing the fetched todos
+  // - drop the first 2 events to avoid re-storing the originally fetched todos
   // - drop repeats so we don't store the same data twice
   const save$ = STATE.stream
     .compose(dropUntil(fromLocalStorage$))
@@ -84,7 +89,10 @@ function intent({STATE, DOM, ROUTER, STORE}) {
                          .filter(title => title != '')
 
   // map the streams built above to 'action' names
-  // - we 'do' the actions in the 'actions' section
+  // - this list of names becomes the 'menu' of actions that can be applied
+  //   in the 'action' section below
+  // - the specified action will 'fire' every time the associated stream get an event
+  // - the value of the emitted stream event will be passed as the 'data' to the action
   return {
     ADD_ROUTE:       addRoute$,
     FROM_STORE:      fromLocalStorage$,
@@ -100,17 +108,17 @@ function intent({STATE, DOM, ROUTER, STORE}) {
 
 
 
-// ACTIONS OBJECT   (optional, but requires 'intents' function is this is set)
+// ACTIONS OBJECT   (optional, but requires 'intents' function if this is set)
 // - maps 'actions' to 'reducers' or 'commands' which *DO* the action
 // - the object should have a key for any 'sink' receiving a reducer or command
-// - each 'sink' key should contain keys for each 'action' to be acted on by that sink
+// - each 'sink' key should contain sub-keys for each 'action' to be acted on by that sink
 // - the 'state' sink takes either a 'reducer' function, or an object:
 //   + reducer functions are passed (state, data, next)
 //     state: current state (global or isolated depending on component options)
 //     data:  any data found in the event that triggered this action
 //     next:  function to set a follow-up action to perform e.g. next('SOME_OTHER_ACTION', dataForTheNextAction)
-//     return: reducers should return the new state.. usually something like `return { ...state, changed: 'new value' }
-//             (the special constant ABORT will stop antyhing from happening)
+//     return: reducers should return the new state.. usually something like `return { ...state, changed: 'new value' }`
+//             (the special constant ABORT can be returned to stop antyhing from happening)
 //   + object: will replace the current state with the object provided
 // - all other sinks take a command function, object, or boolean true
 //   + function: called with (data, next)
@@ -121,9 +129,27 @@ function intent({STATE, DOM, ROUTER, STORE}) {
 //   + object: will be passed 'as is' to the sink
 //   + boolean true: will cause the data from the triggering stream to be passed directly to the sink
 // - the 'INITIALIZE' and 'BOOTSTRAP' actions are fired automatically whenever the component is instantiated
-//   + INITIALIZE: run immediately upon instantiation. 'data' is the value of initialData provided to component()
-//                 if not specified, the initialData will automatically be set as the state
+//   + INITIALIZE: run immediately upon instantiation, and can ONLY be passed to the STATE sink.
+//                 The 'data' is the value of initialData provided to component()
+//                 if no INITIALIZE action is specified, the initialData will
+//                 automatically be set as the state
 //   + BOOTSTRAP:  run after the initial state is set.  useful for triggering fetches for remote data or other startup tasks
+//                 and can be passed to any valid sink
+//
+//  example:
+//
+//  const action = {
+//    SINK_NAME: {
+//      ACTION_NAME: (data, next) => {
+//        const dataForFollowUp = data.myValue
+//        next('SOME_FOLLOW_UP_ACTION', dataForFollowUp)
+//        return { properties: 'expected by the sink', moreData: 'data is good' }
+//      }
+//    },
+//    ANOTHER_SINK: {
+//      SOME_FOLLOW_UP_ACTION: (data, next) => ({ valuesFor: 'this other sink})
+//    }
+//  }
 //
 const action = {
 
@@ -175,19 +201,23 @@ const action = {
   // DOM Side Effects sink
   // - commands to perform effects that can't be done through re-rendering
   // - common examples are setting 'focus', changing the value of a focused input field, scrolling, etc.
+  // NOTE: almost all normal application tasks can be done without programatically touching the DOM
+  //       if you use this for more than focusing input fields or scrolling, there's a VERY good chance
+  //       that you are overcomplicating the task, or not thinking in a 'streams/observables' way
   DOMFX: {
     // send a command to clear the 'new todo' form
     CLEAR_FORM: { type: 'SET_VALUE', data: { selector: '.new-todo' } },
   },
 
   // Local storage sink
-  // - used to save data to local storage a the provided key
+  // - used to save data to local storage at the provided key
   STORE: {
     TO_STORE:   (data) => ({ key: 'todos', value: data.todos }),
   },
 
   // browser navigation router
   // - names sent to this sink will cause the 'router' source to fire when the browser navigates to that name (e.g. mysite.com/#/mySuperSpecialRoute)
+  // - the boolean 'true' value causes the value of the triggering stream (from the 'intent' function) to be sent on directly
   ROUTER: {
     ADD_ROUTE: true,
   }
