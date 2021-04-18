@@ -11,18 +11,18 @@ import {App} from './app'
 //  - state is updated by emitting a stream of reducers to the "state" sink
 //  - each level of the app hierarchy is automatically scoped so reducers effect only that components state
 //  - see docs for @cycle/state and @cycle/isolate for more information
-const main = withState(App)
+const main = withState(App, 'STATE')
 
 const drivers = {
-  // DOM driver - attach app to the #root element 
+  // DOM driver - attach app to the #root element
   DOM:    makeDOMDriver('#root'),
   // DOM side effects driver for handling non-render interactions with the page
   // mostly useful for input fields on forms
-  DOMfx:  DOMfxDriver,
+  DOMFX:  DOMfxDriver,
   // driver to handle getting and putting data to local storage
-  store:  localStorageDriver,
+  STORE:  localStorageDriver,
   // driver for setting up page routes and getting routing events
-  router: routerDriver,
+  ROUTER: routerDriver,
 }
 
 run(main, drivers)

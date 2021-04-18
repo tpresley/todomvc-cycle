@@ -10,7 +10,10 @@ export default function todo(sources) {
 }
 
 
-function intent({state, DOM}) {
+
+
+
+function intent({STATE, DOM}) {
   // collect DOM events and elements
   const toggle$   = DOM.select('.toggle').events('click')
   const label$    = DOM.select('.todo label').events('dblclick')
@@ -24,7 +27,7 @@ function intent({state, DOM}) {
   const allClick$ = DOM.select('document')
                        .events('click')
                        .filter(e => e.target.className != 'edit')
-  
+
   // map submitted edits to the new title
   // - wait until we start editing (label$ = double cliicking the todo's label)
   // - take one of any of the following: enter key press, input field blurred, user click anywhere on the document
@@ -42,8 +45,13 @@ function intent({state, DOM}) {
   }
 }
 
+
+
+
+
+
 const action = {
-  state: {
+  STATE: {
     // toggle completion of the todo
     TOGGLE:     (state, _) => ({ ...state, completed: !state.completed }),
     // delete todo
@@ -75,30 +83,34 @@ const action = {
     }
   },
 
-  DOMfx: {
+  DOMFX: {
     SET_EDIT_VALUE:   (data) => ({ type: 'SET_VALUE', data }),
     FOCUS_EDIT_FIELD: (data) => ({ type: 'FOCUS',     data }),
   },
 }
-  
 
-function view({ state }) {
+
+
+
+
+
+function view({ STATE }) {
   // if the todo is hidden, don't render
-  if (state.hidden) return
+  if (STATE.hidden) return
   // calculate class for todo
-  const classNames = classes('todo', 'todo-' + state.id, {completed: state.completed, editing: state.editing})
-  
+  const classNames = classes('todo', 'todo-' + STATE.id, {completed: STATE.completed, editing: STATE.editing})
+
   // is the todo completed?
-  const checked = !!state.completed
+  const checked = !!STATE.completed
 
   return (
     <li className={ classNames }>
       <div className="view">
         <input className="toggle" type="checkbox" checked={ checked } />
-        <label>{ state.title }</label>
+        <label>{ STATE.title }</label>
         <button className="destroy" />
       </div>
-      <input className="edit" type="text" value={ state.title } />
+      <input className="edit" type="text" value={ STATE.title } />
     </li>
   )
 }

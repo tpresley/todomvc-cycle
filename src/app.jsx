@@ -19,7 +19,7 @@ const FILTER_LIST = [ 'all', 'active', 'completed' ]
 export function App(sources) {
   // initial state of the application
   const initialState = {visibility: 'all', todos: []}
-  
+
   // create the component
   // - 'sources' is the only required parameter (in almost all cases you can just pass the incoming sources)
   // - 'children' is an object of sub-components
@@ -27,6 +27,9 @@ export function App(sources) {
   //   + value is a component factory function (sub-components will be instantiated automatically)
   return component({ name: LABEL, sources, intent, action, view, children: { todos }, initialState })
 }
+
+
+
 
 
 // INTENT FUNCTION   (optional, but needed to trigger any actions)
@@ -39,35 +42,35 @@ export function App(sources) {
 //     * we don't *DO* anything here... we are just collecting a stream of 'actions' to do later
 //
 // example:
-// 
+//
 // return { NAME_OF_ACTION: streamOfMeaningfulEvents }
 //
-function intent({state, DOM, router, store}) {
+function intent({STATE, DOM, ROUTER, STORE}) {
   // convert the array of filter types to a stream
   const addRoute$ = xs.fromArray(FILTER_LIST)
-  
+
   // fetch stored todos from local storage
   //  - init to an empty array if no todos were found
   //  - wait until we get the initial state to avoid the retrieved todos getting overwritten
-  const fromLocalStorage$ = state.stream
+  const fromLocalStorage$ = STATE.stream
     .take(1)
-    .map( _ => store.get('todos', []).take(1) )
+    .map( _ => STORE.get('todos', []).take(1) )
     .flatten()
 
   // fetch state changes to trigger writes to localstorage
   // - only start after we get the todos from localstorage
   // - drop the first 2 events to avoid re-storing the fetched todos
   // - drop repeats so we don't store the same data twice
-  const save$ = state.stream
+  const save$ = STATE.stream
     .compose(dropUntil(fromLocalStorage$))
     .drop(2)
     .compose(dropRepeats())
-  
+
   // collect required DOM events and elements
   const toggleAll$       = DOM.select('.toggle-all').events('click')
   const clearCompleted$  = DOM.select('.clear-completed').events('click')
   const input$           = DOM.select('.new-todo')
-  
+
   // get events from the input field
   //  - the inputEvents helper returns common events and automatically returns the current value
   const {value$, enter$} = inputEvents(input$)
@@ -79,19 +82,23 @@ function intent({state, DOM, router, store}) {
   const newTodo$ = enter$.compose(sampleCombine(value$))
                          .map(([ _, title ]) => title.trim())
                          .filter(title => title != '')
-  
+
   // map the streams built above to 'action' names
-  // - we 'do' the actions in the 'actions' section 
+  // - we 'do' the actions in the 'actions' section
   return {
     ADD_ROUTE:       addRoute$,
     FROM_STORE:      fromLocalStorage$,
     TO_STORE:        save$,
-    VISIBILITY:      router,
+    VISIBILITY:      ROUTER,
     NEW_TODO:        newTodo$,
     TOGGLE_ALL:      toggleAll$,
     CLEAR_COMPLETED: clearCompleted$,
   }
 }
+
+
+
+
 
 // ACTIONS OBJECT   (optional, but requires 'intents' function is this is set)
 // - maps 'actions' to 'reducers' or 'commands' which *DO* the action
@@ -109,7 +116,7 @@ function intent({state, DOM, router, store}) {
 //   + function: called with (data, next)
 //     data:  any data found in the event that triggered this action
 //     next:  function to set a follow-up action to perform e.g. next('SOME_OTHER_ACTION', dataForTheNextAction)
-//     return: whatever input is expected by the sink 
+//     return: whatever input is expected by the sink
 //             (the special constant ABORT will stop antyhing from happening)
 //   + object: will be passed 'as is' to the sink
 //   + boolean true: will cause the data from the triggering stream to be passed directly to the sink
@@ -119,10 +126,10 @@ function intent({state, DOM, router, store}) {
 //   + BOOTSTRAP:  run after the initial state is set.  useful for triggering fetches for remote data or other startup tasks
 //
 const action = {
-  
+
   // state sink actions
   // - takes reducer functions that return the updated state
-  state: {
+  STATE: {
     // INITIALIZE: (state, data) => ({ ...data }),
     FROM_STORE: (state, data) => ({ ...state, todos: data }),
     // change the visibility filter for the todos
@@ -137,14 +144,14 @@ const action = {
 
       // build new todo object
       const newTodo = {
-        id: nextId, 
-        title: data, 
+        id: nextId,
+        title: data,
         completed: false
       }
 
       // add the new todo to the state
       return {
-        ...state, 
+        ...state,
         todos: [ ...state.todos, newTodo ]
       }
     },
@@ -168,23 +175,28 @@ const action = {
   // DOM Side Effects sink
   // - commands to perform effects that can't be done through re-rendering
   // - common examples are setting 'focus', changing the value of a focused input field, scrolling, etc.
-  DOMfx: {
+  DOMFX: {
     // send a command to clear the 'new todo' form
     CLEAR_FORM: { type: 'SET_VALUE', data: { selector: '.new-todo' } },
-  }, 
+  },
 
   // Local storage sink
   // - used to save data to local storage a the provided key
-  store: {
+  STORE: {
     TO_STORE:   (data) => ({ key: 'todos', value: data.todos }),
   },
 
   // browser navigation router
   // - names sent to this sink will cause the 'router' source to fire when the browser navigates to that name (e.g. mysite.com/#/mySuperSpecialRoute)
-  router: {
+  ROUTER: {
     ADD_ROUTE: true,
   }
 }
+
+
+
+
+
 
 // VIEW FUNCTION   (optional, but makes for a boring component without it!)
 // - receives an object with a key for state, and a key for each component specified in the 'children' parameter of component()
@@ -193,19 +205,19 @@ const action = {
 // - children vDoms are already rendered and can be added 'as is' to your JSX or DOM as normal javascript variables
 //   + vDom from child components that are 'collections' are arrays, so can optionally be iterated over when needed
 //
-function view({state, todos}) {
+function view({STATE, todos}) {
   // total todos
-  const total      = state.todos.length
+  const total      = STATE.todos.length
   // number of todos that haven't been marked as complete
-  const remaining  = state.todos.filter(todo => !todo.completed).length
+  const remaining  = STATE.todos.filter(todo => !todo.completed).length
   // number of completed todos
   const completed  = total - remaining
   // are all todos completed?
   const allDone    = remaining === 0
-  
+
   // render helpers
-  const selected   = (visibility => filter => visibility === filter ? ' selected' : '')(state.visibility)
-  
+  const selected   = (visibility => filter => visibility === filter ? ' selected' : '')(STATE.visibility)
+
   return (
     <section className="todoapp">
       { header() }
