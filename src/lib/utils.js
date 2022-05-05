@@ -3,8 +3,6 @@ import isolate from '@cycle/isolate'
 import {makeCollection} from '@cycle/state'
 import dropRepeats from 'xstream/extra/dropRepeats'
 
-export const ABORT = '~~ABORT~~'
-
 /**
  * calculate the next id given an array of objects
  *
@@ -109,18 +107,24 @@ function classes_processObject(obj) {
  * @param {String} initialValue initial value to emit on the special `value$` stream
  * @return {Object} collection of event streams ready for mapping to actions
  */
-export function inputEvents (input$, initialValue='') {
-  const keydown$  = input$.events('keydown')
-  const keyup$    = input$.events('keyup')
-  const change$   = input$.events('change')
-  const focus$    = input$.events('focus')
-  const blur$     = input$.events('blur')
-  const value$    = xs.merge(keydown$, change$).map(e => e.target.value).startWith(initialValue)
+export function inputEvents (el$, initialValue='') {
+  const input$ = el$.events('input')
+  const keydown$  = el$.events('keydown')
+  const keyup$    = el$.events('keyup')
+  const change$   = el$.events('change')
+  const focus$    = el$.events('focus')
+  const blur$     = el$.events('blur')
+  const value$    = xs.merge(focus$, input$)
+    .map(e => e.target.value)
+    .startWith(initialValue)
+    .remember()
+
   const enter$    = keydown$.filter(e => e.keyCode === 13).mapTo('enter')
   const escape$   = keydown$.filter(e => e.keyCode === 27).mapTo('escape')
 
   return {
     value$,
+    input$,
     enter$,
     escape$,
     focus$,

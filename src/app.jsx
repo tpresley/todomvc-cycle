@@ -10,7 +10,17 @@ const name = 'APP'
 
 const FILTER_LIST = ['all', 'active', 'completed']
 
-// root component
+
+
+
+// INTENT FUNCTION   (optional, but needed to trigger any actions)
+// - takes the 'sources' object
+// - returns an object that maps 'intents' to 'actions'
+//   + intents are signals from outside the component (events from sources) that indicate something should happen
+//     * intents are just streams that 'fire' when an action should happen
+//     * they can optionally include relevent data to help perform the action later
+//   + actions are just a name/label for something that will happen
+//     * we don't *DO* anything here... we are just collecting a stream of 'actions' to do later
 //
 // sources:
 //  - STATE: stream of application state objects
@@ -48,6 +58,9 @@ function intent({ STATE, DOM, ROUTER, STORE }) {
   const { value$, enter$ } = inputEvents(input$)
 
   // create a stream of titles whenever a new todo is submitted
+  // - wait until the 'enter' key is pressed
+  // - map the event stream to just the 'title' (current value of the input)
+  // - filter out blank titles
   const newTodo$ = enter$.compose(sampleCombine(value$))
                          .map(([_, title]) => title.trim())
                          .filter(title => title !== '')
@@ -130,15 +143,20 @@ function view({ STATE, todos }) {
 
   return (
     <section className="todoapp">
-      {renderHeader()}
-      {(total > 0) ? renderMain(allDone, todos) : ''}
-      {(total > 0) ? renderFooter(selected, remaining, completed) : ''}
+      { header() }
+      { (total > 0) ? main(allDone, todos) : '' }
+      { (total > 0) ? footer(selected, remaining, completed) : '' }
     </section>
   )
 }
 
 
-function renderHeader() {
+
+
+
+
+
+function header() {
   return (
     <header className="header">
       <h1>todos</h1>
@@ -147,48 +165,48 @@ function renderHeader() {
   )
 }
 
-function renderMain(allDone, todos) {
+function main(allDone, todos) {
   return (
     <section className="main">
       <input id="toggle-all" className="toggle-all" type="checkbox" checked={allDone} />
       <label for="toggle-all">Mark all as complete</label>
       <ul className="todo-list">
-        {todos}
+        { todos }
       </ul>
     </section>
   )
 }
 
-function renderFooter(selected, remaining, completed) {
+function footer(selected, remaining, completed) {
   return (
     <footer className="footer">
-      {renderCount(remaining)}
-      {renderFilters(selected)}
-      {(completed > 0) ? renderClearCompleted() : ''}
+      { todoCount(remaining) }
+      { filters(selected) }
+      { (completed > 0) ? clearCompleted() : '' }
     </footer>
   )
 }
 
-function renderCount(remaining) {
+function todoCount(remaining) {
   return (
     <span className="todo-count">
-      <strong>{remaining}</strong> {(remaining === 1) ? 'item' : 'items'} left
+      <strong>{ remaining }</strong> { (remaining === 1) ? 'item' : 'items' } left
     </span>
   )
 }
 
-function renderFilters(selected) {
+function filters(selected) {
   const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1)
   const links = FILTER_LIST
-  const renderLink = link => <li><a href={`#/${link}`} className={selected(link)}>{capitalize(link)}</a></li>
+  const renderLink = link => <li><a href={ `#/${link}` } className={ selected(link) }>{ capitalize(link) }</a></li>
   return (
     <ul className="filters">
-      {links.map(renderLink)}
+      { links.map(renderLink) }
     </ul>
   )
 }
 
-function renderClearCompleted() {
+function clearCompleted() {
   return <button className="clear-completed">Clear completed</button>
 }
 

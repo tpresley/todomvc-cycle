@@ -131,4 +131,10 @@ const lense = {
   }
 }
 
+// build a new 'collection' component of 'todo' components
+// - the resulting collection will automatically grow and shink with changes to the state
+// - all sources and sinks are automatically 'wired' properly for almost all use cases
+// - returns an instantiable 'component', so can be included in the 'children' parameter of the component() function
+// - for very simple applications the 'lense' parameter can be a string specifying an array in the state
+//   but most applications quickly get to the point they need a 'lense' like above
 export default collectionOf(todo, lense)
