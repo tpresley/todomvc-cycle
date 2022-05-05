@@ -59,7 +59,7 @@ const action = {
     return { ...state, title: data, editing: false, cachedTitle: '' }
   } },
 
-  EDIT_CANCEL: { STATE: (state) => {
+  EDIT_CANCEL: { STATE: (state, done, next) => {
     const selector = '.todo-' + state.id + ' .edit'
     // set the value of the edit input field back to the original title
     next('SET_EDIT_VALUE', { type: 'SET_VALUE', data: { selector: selector, value: state.cachedTitle } })
