@@ -55,7 +55,9 @@ function intent({ STATE, DOM, ROUTER, STORE }) {
   // add routes to handle filtering based on browser path
   const route$ = xs.fromArray(FILTER_LIST)
 
-  const toStore$ = STATE.stream.map(state => ({key: 'todos', value: state.todos})).drop(1)
+  // save todos to localStorage whenever the app state changes
+  // - ignore the first state event to prevent storing the initialization data
+  const toStore$ = STATE.stream.map(state => ({ key: 'todos', value: state.todos })).drop(1)
 
 
   return {
@@ -99,12 +101,12 @@ const action = {
 
   TOGGLE_ALL: { STATE: (state) => {
     const allDone = state.todos.filter(todo => !todo.completed).length === 0
-    return {...state, todos: state.todos.map(todo => ({...todo, completed: allDone?false:true}))}
+    return {...state, todos: state.todos.map(todo => ({ ...todo, completed: !allDone }))}
   } },
 
   CLEAR_COMPLETED: { STATE: (state) => ({ ...state, todos: state.todos.filter(todo => !todo.completed) })},
 
-  CLEAR_FORM: { DOMFX: ({ type: 'SET_VALUE', data: {selector: '.new-todo'} }) },
+  CLEAR_FORM: { DOMFX: ({ type: 'SET_VALUE', data: { selector: '.new-todo' } }) },
 
   ADD_ROUTE: { ROUTER: true },
 
