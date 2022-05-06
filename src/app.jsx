@@ -45,8 +45,9 @@ function intent({ STATE, DOM, ROUTER, STORE }) {
 
   // fetch stored todos from local storage
   //  - init to an empty array if no todos were found
-  const store$           = STORE.get('todos')
-                                .map(todos => todos || [])
+  //  - only take the first event to prevent reloading after storing todos
+  const store$           = STORE.get('todos', [])
+                                .take(1)
 
   // collect required DOM events and elements
   const toggleAll$       = DOM.select('.toggle-all').events('click')
@@ -70,7 +71,7 @@ function intent({ STATE, DOM, ROUTER, STORE }) {
 
   // save todos to localStorage whenever the app state changes
   // - ignore the first state event to prevent storing the initialization data
-  const toStore$ = STATE.stream.map(state => ({ key: 'todos', value: state.todos })).drop(1)
+  const toStore$ = STATE.stream.drop(1)
 
 
   return {
@@ -123,7 +124,10 @@ const action = {
 
   ADD_ROUTE: { ROUTER: true },
 
-  TO_STORE: { STORE: true },
+  TO_STORE: { STORE: (state, data) => {
+    const todos = state.todos.map(todo => ({ id: todo.id, title: todo.title, completed: todo.completed }))
+    return { key: 'todos', value: todos }
+  } },
 
 }
 
@@ -143,9 +147,18 @@ function view({ STATE, todos }) {
 
   return (
     <section className="todoapp">
-      { header() }
-      { (total > 0) ? main(allDone, todos) : '' }
-      { (total > 0) ? footer(selected, remaining, completed) : '' }
+      <header className="header">
+        <h1>todos</h1>
+        <input className="new-todo" autofocus autocomplete="off" placeholder="What needs to be done?" />
+      </header>
+      <section className="main" style={{ display: total > 0 ? 'block' : 'none' }}>
+        <input id="toggle-all" className="toggle-all" type="checkbox" checked={ allDone } />
+        <label for="toggle-all">Mark all as complete</label>
+        <ul className="todo-list">
+          { todos }
+        </ul>
+      </section>
+      { (total > 0) && footer(selected, remaining, completed) }
     </section>
   )
 }
@@ -153,61 +166,22 @@ function view({ STATE, todos }) {
 
 
 
-
-
-
-function header() {
-  return (
-    <header className="header">
-      <h1>todos</h1>
-      <input className="new-todo" autofocus autocomplete="off" placeholder="What needs to be done?" />
-    </header>
-  )
-}
-
-function main(allDone, todos) {
-  return (
-    <section className="main">
-      <input id="toggle-all" className="toggle-all" type="checkbox" checked={allDone} />
-      <label for="toggle-all">Mark all as complete</label>
-      <ul className="todo-list">
-        { todos }
-      </ul>
-    </section>
-  )
-}
 
 function footer(selected, remaining, completed) {
-  return (
-    <footer className="footer">
-      { todoCount(remaining) }
-      { filters(selected) }
-      { (completed > 0) ? clearCompleted() : '' }
-    </footer>
-  )
-}
-
-function todoCount(remaining) {
-  return (
-    <span className="todo-count">
-      <strong>{ remaining }</strong> { (remaining === 1) ? 'item' : 'items' } left
-    </span>
-  )
-}
-
-function filters(selected) {
   const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1)
   const links = FILTER_LIST
   const renderLink = link => <li><a href={ `#/${link}` } className={ selected(link) }>{ capitalize(link) }</a></li>
   return (
-    <ul className="filters">
-      { links.map(renderLink) }
-    </ul>
+    <footer className="footer">
+      <span className="todo-count">
+        <strong>{ remaining }</strong> { (remaining === 1) ? 'item' : 'items' } left
+      </span>
+      <ul className="filters">
+        { links.map(renderLink) }
+      </ul>
+      { (completed > 0) && <button className="clear-completed">Clear completed</button> }
+    </footer>
   )
-}
-
-function clearCompleted() {
-  return <button className="clear-completed">Clear completed</button>
 }
 
 

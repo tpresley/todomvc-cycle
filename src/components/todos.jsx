@@ -45,9 +45,9 @@ const action = {
   EDIT_START: { STATE: (state, data, next) => {
     const selector = '.todo-' + state.id + ' .edit'
     // update the value of the input field to the current todo title
-    next('SET_EDIT_VALUE',   { type: 'SET_VALUE', data: { selector: selector, value: state.title } })
+    next('SET_EDIT_VALUE',   { selector, value: state.title })
     // set focus on the input field
-    next('FOCUS_EDIT_FIELD', { type: 'FOCUS',     data: { selector: selector } })
+    next('FOCUS_EDIT_FIELD', { selector })
     // mark the todo as being edited and save the current title in case the edit is cancelled
     return { ...state, editing: true, cachedTitle: state.title }
   } },
@@ -62,14 +62,14 @@ const action = {
   EDIT_CANCEL: { STATE: (state, done, next) => {
     const selector = '.todo-' + state.id + ' .edit'
     // set the value of the edit input field back to the original title
-    next('SET_EDIT_VALUE', { type: 'SET_VALUE', data: { selector: selector, value: state.cachedTitle } })
+    next('SET_EDIT_VALUE', { selector: selector, value: state.cachedTitle })
     // set the todo back to the pre-edit value and remove the editing flag
     return { ...state, title: state.cachedTitle, editing: false, cachedTitle: '' }
   } },
 
-  SET_EDIT_VALUE:   { DOMFX: true },
+  SET_EDIT_VALUE:   { DOMFX: (state, data) => ({ type: 'SET_VALUE', data }) },
 
-  FOCUS_EDIT_FIELD: { DOMFX: true },
+  FOCUS_EDIT_FIELD: { DOMFX: (state, data) => ({ type: 'FOCUS', data }) },
 
 }
 
@@ -115,7 +115,7 @@ const lense = {
     //    for best performance, return the same object if you don't want
     //    to re-render, and return a new object if you do
     return state.todos.map(todo => {
-      return filters[state.visibility](todo) ? todo : {...todo, hidden: true}
+      return filters[state.visibility](todo) ? todo : { ...todo, hidden: true }
     })
   },
   set: (state, childState) => {
