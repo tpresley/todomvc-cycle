@@ -1,6 +1,6 @@
 import xs from 'xstream'
 import sampleCombine from 'xstream/extra/sampleCombine'
-import { inputEvents, newId } from './lib/utils'
+import { inputEvents, newId, classes } from './lib/utils'
 import { component } from './lib/cycleHelpers'
 import todos from './components/todos'
 
@@ -146,9 +146,13 @@ function view({ STATE, todos }) {
   const completed  = total - remaining
   // are all todos completed?
   const allDone    = remaining === 0
+  // current filter setting
+  const visibility = STATE.visibility
+  // use the list of filters to generate links in footer
+  const links      = FILTER_LIST
 
-  // render helpers
-  const selected   = (visibility => filter => visibility === filter ? ' selected' : '')(STATE.visibility)
+  const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1)
+  const renderLink = link => <li><a href={ `#/${link}` } className={ classes({ selected: visibility == link }) }>{ capitalize(link) }</a></li>
 
   return (
     <section className="todoapp">
@@ -156,40 +160,32 @@ function view({ STATE, todos }) {
         <h1>todos</h1>
         <input className="new-todo" autofocus autocomplete="off" placeholder="What needs to be done?" />
       </header>
-      <section className="main" style={{ display: total > 0 ? 'block' : 'none' }}>
-        <input id="toggle-all" className="toggle-all" type="checkbox" checked={ allDone } />
-        <label for="toggle-all">Mark all as complete</label>
-        <ul className="todo-list">
-          { todos }
-        </ul>
-      </section>
-      { (total > 0) && footer(selected, remaining, completed) }
+
+      { (total > 0) &&
+        <section className="main">
+          <input id="toggle-all" className="toggle-all" type="checkbox" checked={ allDone } />
+          <label for="toggle-all">Mark all as complete</label>
+          <ul className="todo-list">
+            { todos }
+          </ul>
+        </section>
+      }
+
+      { (total > 0) &&
+        <footer className="footer">
+          <span className="todo-count">
+            <strong>{ remaining }</strong> { (remaining === 1) ? 'item' : 'items' } left
+          </span>
+          <ul className="filters">
+            { links.map(renderLink) }
+          </ul>
+          { (completed > 0) && <button className="clear-completed">Clear completed</button> }
+        </footer>
+      }
+
     </section>
   )
 }
-
-
-
-
-
-function footer(selected, remaining, completed) {
-  const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1)
-  const links = FILTER_LIST
-  const renderLink = link => <li><a href={ `#/${link}` } className={ selected(link) }>{ capitalize(link) }</a></li>
-  return (
-    <footer className="footer">
-      <span className="todo-count">
-        <strong>{ remaining }</strong> { (remaining === 1) ? 'item' : 'items' } left
-      </span>
-      <ul className="filters">
-        { links.map(renderLink) }
-      </ul>
-      { (completed > 0) && <button className="clear-completed">Clear completed</button> }
-    </footer>
-  )
-}
-
-
 
 
 
