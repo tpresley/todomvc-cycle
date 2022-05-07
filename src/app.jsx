@@ -114,18 +114,23 @@ const action = {
   } },
 
   TOGGLE_ALL: { STATE: (state) => {
-    const allDone = state.todos.filter(todo => !todo.completed).length === 0
-    return {...state, todos: state.todos.map(todo => ({ ...todo, completed: !allDone }))}
+    const allDone = state.todos.every(todo => todo.completed)
+    const todos   = state.todos.map(todo => ({ ...todo, completed: !allDone }))
+    return {...state, todos }
   } },
 
-  CLEAR_COMPLETED: { STATE: (state) => ({ ...state, todos: state.todos.filter(todo => !todo.completed) })},
+  CLEAR_COMPLETED: { STATE: (state) => {
+    const todos = state.todos.filter(todo => !todo.completed)
+    return { ...state, todos }
+  } },
 
   CLEAR_FORM: { DOMFX: ({ type: 'SET_VALUE', data: { selector: '.new-todo' } }) },
 
   ADD_ROUTE: { ROUTER: true },
 
   TO_STORE: { STORE: (state, data) => {
-    const todos = state.todos.map(todo => ({ id: todo.id, title: todo.title, completed: todo.completed }))
+    // sanitize todo objects
+    const todos = state.todos.map(({ id, title, completed }) => ({ id, title, completed }))
     return { key: 'todos', value: todos }
   } },
 
