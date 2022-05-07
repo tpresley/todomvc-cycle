@@ -8,8 +8,8 @@ import Delay from 'xstream/extra/delay.js'
 import Concat from 'xstream/extra/concat.js'
 import debounce from 'xstream/extra/debounce.js'
 import DropRepeats from 'xstream/extra/dropRepeats.js'
+import Throttle from 'xstream/extra/throttle.js'
 
-import makeLog from './makeLog.js'
 
 // import syntax has bugs for xstream in Node context
 // this attempts to normalize to work in both Node and browser
@@ -21,8 +21,9 @@ if (!xs.never && xs.default && xs.default.never) {
 const concat = (Concat && Concat.default) ? Concat.default : Concat
 const delay  = (Delay && Delay.default) ? Delay.default : Delay
 const dropRepeats = (DropRepeats && DropRepeats.default) ? DropRepeats.default : DropRepeats
+const throttle = (Throttle && Throttle.default) ? Throttle.default : Throttle
 
-const DEBUG = process.env.DEBUG == 'true' || process.env.DEBUG === true
+const ENVIRONMENT = ((typeof window != 'undefined' && window) || (process && process.env)) || {}
 
 
 const REQUEST_SELECTOR_METHOD = 'request'
@@ -121,10 +122,10 @@ class Component {
     this.requestSourceName = requestSourceName
     this.sourceNames       = Object.keys(sources)
 
-    const state$ = sources[stateSourceName].stream && sources[stateSourceName].stream
+    const state$ = sources[stateSourceName] && sources[stateSourceName].stream
 
     if (state$) {
-      this.currentState = {}
+      this.currentState = initialState || {}
       this.sources[this.stateSourceName].stream.subscribe({
         next: val => {
           this.currentState = val
@@ -241,7 +242,7 @@ class Component {
 
               console.log(`${ timestamp } ${ ip } ${ req.method } ${ req.url }`)
 
-              if (DEBUG) {
+              if (ENVIRONMENT.DEBUG) {
                 this.action$.setDebugListener({next: ({ type }) => console.log(`[${ this.name }] Action from ${ this.requestSourceName } request: <${ type }>`)})
               }
 
@@ -336,10 +337,10 @@ class Component {
 
         const wrapped = onned.compose(this.log(data => {
             if (isStateSink) {
-              return `State reducer added: <${ type }>`
+              return `State reducer added: <${ action }>`
             } else {
               const extra = data && (data.type || data.command || data.name || data.key || (Array.isArray(data) && 'Array') || data)
-              return `Data sent to [${ driver }]: <${ type }> ${ extra }`
+              return `Data sent to [${ sink }]: <${ action }> ${ extra }`
             }
           }))
 
@@ -445,6 +446,8 @@ class Component {
     }, {names: [], streams: []})
 
     const merged = xs.combine(...pulled.streams)
+
+    const throttled = merged
       .compose(debounce(1))
       .map(arr => {
         return pulled.names.reduce((acc, name, index) => {
@@ -453,13 +456,17 @@ class Component {
         }, {})
       })
 
-    this.vdom$ = merged.map(this.view).remember().compose(this.log('View Rendered'))
+    this.vdom$ = throttled.map(this.view).remember().compose(this.log('View Rendered'))
   }
 
   initSinks() {
     this.sinks = this.sourceNames.reduce((acc, name) => {
       if (name == this.DOMSourceName) return acc
-      acc[name] = xs.merge((this.model$[name] || xs.never()), ...this.children$[name])
+      if (name === this.stateSourceName) {
+        acc[name] = xs.merge((this.model$[name] || xs.never()), this.sources[this.stateSourceName].stream.filter(_ => false), ...this.children$[name])
+      } else {
+        acc[name] = xs.merge((this.model$[name] || xs.never()), ...this.children$[name])
+      }
       return acc
     }, {})
 
@@ -537,7 +544,11 @@ export function collectionOf(component, stateLense, combineList=['DOM'], globalL
       channel:      stateSourceName,
       collectSinks: instances => {
         return Object.entries(sources).reduce((acc, [name, stream]) => {
-          acc[name] = instances[(combineList.includes(name) ? 'pickCombine' : 'pickMerge')](name)
+          if (combineList.includes(name)) {
+            acc[name] = instances.pickCombine(name)
+          } else {
+            acc[name] = instances.pickMerge(name)
+          }
           return acc
         }, {})
       }
@@ -548,5 +559,63 @@ export function collectionOf(component, stateLense, combineList=['DOM'], globalL
     globalList.forEach(global => isolateOpts[global] = null)
 
     return makeIsolatedCollection(collectionOpts, isolateOpts, sources)
+  }
+}
+
+
+
+
+/**
+ * factory to create a logging function meant to be used inside of an xstream .compose()
+ *
+ * @param {String} context name of the component or file to be prepended to any messages
+ * @return {Function}
+ *
+ * returned function accepts either a `String` of `Function`
+ * `String` values will be logged to `console` as is
+ * `Function` values will be called with the current `stream` value and the result will be logged to `console`
+ * all output will be prepended with the `context` (ex. "[CONTEXT] My output")
+ * ONLY outputs if the global `DEBUG` variable is set to `true`
+ */
+// function makeLog (context) {
+//   return function (msg) {
+//     const fixedMsg = (typeof msg === 'function') ? msg : _ => msg
+
+//     if (ENVIRONMENT.DEBUG) {
+//       return stream => stream.map(val => {
+//         const msg = fixedMsg(val)
+//         console.log(`[${context}] ${msg}`)
+//         return val
+//       })
+//     } else {
+//       return stream => stream
+//     }
+//   }
+// }
+
+
+/**
+ * factory to create a logging function meant to be used inside of an xstream .compose()
+ *
+ * @param {String} context name of the component or file to be prepended to any messages
+ * @return {Function}
+ *
+ * returned function accepts either a `String` of `Function`
+ * `String` values will be logged to `console` as is
+ * `Function` values will be called with the current `stream` value and the result will be logged to `console`
+ * all output will be prepended with the `context` (ex. "[CONTEXT] My output")
+ * ONLY outputs if the global `DEBUG` variable is set to `true`
+ */
+ export default function makeLog (context) {
+  return function (msg) {
+    const fixedMsg = (typeof msg === 'function') ? msg : _ => msg
+    return stream => {
+      stream.map(fixedMsg).subscribe({
+        next: msg => {
+          if (ENVIRONMENT.DEBUG == 'true' || ENVIRONMENT.DEBUG === true) console.log(`[${context}] ${msg}`)
+        }
+      })
+      return stream
+    }
   }
 }
