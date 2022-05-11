@@ -10,6 +10,7 @@
     "@cycle/isolate": "^5.0.0",
     "@cycle/run": "3.3.0",
     "@cycle/state": "^1.2.0",
+    "cyclejs-component": "^1.0.0",
     "director": "^1.2.8",
     "todomvc-app-css": "^2.2.0",
     "todomvc-common": "^1.0.5",

@@ -1,6 +1,6 @@
 import xs from 'xstream'
 import sampleCombine from 'xstream/extra/sampleCombine'
-import { component, collectionOf } from '../lib/cycleHelpers'
+import { component, collection } from 'cyclejs-component'
 import { inputEvents, classes } from '../lib/utils'
 
 
@@ -36,7 +36,7 @@ function intent({ STATE, DOM }) {
 }
 
 
-const action = {
+const model = {
 
   TOGGLE:     { STATE: (state) => ({ ...state, completed: !state.completed }) },
 
@@ -98,7 +98,7 @@ function view({ STATE }) {
 
 
 
-const todo = component({ name, intent, action, view })
+const todo = component({ name, intent, model, view })
 
 // filter functions for each visibility option
 const filters = {
@@ -137,4 +137,4 @@ const lense = {
 // - returns an instantiable 'component', so can be included in the 'children' parameter of the component() function
 // - for very simple applications the 'lense' parameter can be a string specifying an array in the state
 //   but most applications quickly get to the point they need a 'lense' like above
-export default collectionOf(todo, lense)
+export default collection(todo, lense)

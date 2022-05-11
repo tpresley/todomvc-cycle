@@ -1,7 +1,7 @@
 import xs from 'xstream'
 import sampleCombine from 'xstream/extra/sampleCombine'
 import { inputEvents, newId, classes } from './lib/utils'
-import { component } from './lib/cycleHelpers'
+import { component } from 'cyclejs-component'
 import todos from './components/todos'
 
 
@@ -86,7 +86,7 @@ function intent({ STATE, DOM, ROUTER, STORE }) {
 }
 
 
-const action = {
+const model = {
 
   VISIBILITY: { STATE: (state, data) => ({ ...state, visibility: data }) },
 
@@ -200,4 +200,4 @@ const children = {
   todos
 }
 
-export default component({ name, intent, action, view, children, initialState })
+export default component({ name, intent, model, view, children, initialState })
