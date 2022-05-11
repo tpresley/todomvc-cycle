@@ -1,3 +1,5 @@
+'use strict'
+
 import xs from 'xstream'
 import dropRepeats from 'xstream/extra/dropRepeats';
 
@@ -11,7 +13,7 @@ export default function localStorageDriver (fx$) {
   }})
 
   return {
-    get: (key, defaultValue) => {
+    get: (key, defaultValue, emitChanges=false) => {
       const fromStorage = window.localStorage.getItem(key)
       let parsed
       try {
@@ -21,10 +23,14 @@ export default function localStorageDriver (fx$) {
         parsed = defaultValue
       }
 
-      return fx$.filter(({key: key_, value}) => key == key_)
-                .map(({value}) => value)
-                .compose(dropRepeats())
-                .startWith(parsed)
+      if (emitChanges) {
+        return fx$.filter(({key: key_, value}) => key == key_)
+                  .map(({value}) => value)
+                  .compose(dropRepeats())
+                  .startWith(parsed)
+      } else {
+        return xs.of(parsed)
+      }
     }
   }
 }

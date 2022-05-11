@@ -9,7 +9,7 @@ const name = 'TODO'
 
 
 
-function intent({ STATE, DOM }) {
+function intent({ DOM }) {
   // collect DOM events and elements
   const toggle$   = DOM.select('.toggle').events('click')
   const label$    = DOM.select('.todo label').events('dblclick')
@@ -74,14 +74,14 @@ const model = {
 }
 
 
-function view({ STATE }) {
-  if (STATE.hidden) return
+function view({ state }) {
+  const { id, hidden, completed, editing, title } = state
+  if (hidden) return
   // calculate class for todo
-  const classNames = classes('todo', 'todo-' + STATE.id, { completed: STATE.completed, editing: STATE.editing })
+  const classNames = classes('todo', 'todo-' + id, { completed, editing })
 
-  const title = STATE.title
   // is the todo completed?
-  const checked = !!STATE.completed
+  const checked = !!completed
 
   return (
     <li className={ classNames }>

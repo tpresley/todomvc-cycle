@@ -47,7 +47,6 @@ function intent({ STATE, DOM, ROUTER, STORE }) {
   //  - init to an empty array if no todos were found
   //  - only take the first event to prevent reloading after storing todos
   const store$           = STORE.get('todos', [])
-                                .take(1)
 
   // collect required DOM events and elements
   const toggleAll$       = DOM.select('.toggle-all').events('click')
@@ -137,17 +136,17 @@ const model = {
 }
 
 
-function view({ STATE, todos }) {
+function view({ state, todos }) {
   // total todos
-  const total      = STATE.todos.length
+  const total      = state.todos.length
   // number of todos that haven't been marked as complete
-  const remaining  = STATE.todos.filter(todo => !todo.completed).length
+  const remaining  = state.todos.filter(todo => !todo.completed).length
   // number of completed todos
   const completed  = total - remaining
   // are all todos completed?
   const allDone    = remaining === 0
   // current filter setting
-  const visibility = STATE.visibility
+  const visibility = state.visibility
   // use the list of filters to generate links in footer
   const links      = FILTER_LIST
 
