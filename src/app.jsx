@@ -6,11 +6,8 @@ import todos from './components/todos'
 
 
 
-const FILTER_LIST = ['all', 'active', 'completed']
-
-
 // filter functions for each visibility option
-const filters = {
+const FILTER_LIST = {
   all:       todo => true,
   active:    todo => !todo.completed,
   completed: todo => todo.completed
@@ -39,7 +36,7 @@ export default component({
     VISIBILITY: (state, visibility) => ({
       ...state,
       visibility,
-      todos: state.todos.map(todo => ({ ...todo, hidden: !filters[visibility](todo) }))
+      todos: state.todos.map(todo => ({ ...todo, hidden: !FILTER_LIST[visibility](todo) }))
     }),
 
     FROM_STORE: (state, data) => ({ ...state, todos: data }),
@@ -111,7 +108,7 @@ export default component({
                            .filter(title => title !== '')
 
     // add routes to handle filtering based on browser path
-    const route$ = xs.fromArray(FILTER_LIST)
+    const route$ = xs.fromArray(Object.keys(FILTER_LIST))
 
     // save todos to localStorage whenever the app state changes
     // - ignore the first state event to prevent storing the initialization data
@@ -131,8 +128,8 @@ export default component({
 
   view: ({ state, todos }) => {
     const { visibility, total, remaining, completed, allDone } = state
-    // use the list of filters to generate links in footer
-    const links      = FILTER_LIST
+
+    const links =  Object.keys(FILTER_LIST)
 
     const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1)
     const renderLink = link => <li><a href={ `#/${link}` } className={ classes({ selected: visibility == link }) }>{ capitalize(link) }</a></li>
